@@ -12,6 +12,7 @@ extern "C"
 	// Constants
 #define BITMAP_SIZE_BYTES 32         //  
 #define BITMAP_SIZE_BITS (BITMAP_SIZE_BYTES * 8)
+#define BITMAP_START_BLOCK 127
 #define BLOCK_STORE_NUM_BLOCKS 256   // 2^ blocks. 
 #define BLOCK_STORE_AVAIL_BLOCKS (BLOCK_STORE_NUM_BLOCKS - 1) // First block consumed by the FBM
 #define BLOCK_SIZE_BYTES 256         // 2^8 BYTES per block

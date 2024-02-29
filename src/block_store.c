@@ -10,8 +10,7 @@ typedef struct block
     char data[BLOCK_SIZE_BYTES]; //Even though it is a char type it can be interpreted as any type by using the mem functions (char type is 1 byte)
 } block_t;
 
-    //Will need to store arbitrary data (void types)
-    //Will need to store the data in blocks of bytes (if user wants to store more than a byte they will need to do multiple requests)
+//Will need to store the data in blocks of bytes (if user wants to store more than a byte they will need to do multiple requests)
   struct block_store
   {
     block_t* store;
@@ -30,10 +29,10 @@ block_store_t *block_store_create()
 {
     block_store_t* block_store = (struct block_store*)malloc(sizeof(block_store));
     block_store->store = malloc(sizeof(block_t) * BLOCK_STORE_NUM_BLOCKS);
-    memset(block_store->store, 0, BLOCK_STORE_NUM_BLOCKS);
+    memset(block_store->store, 0, BLOCK_STORE_NUM_BYTES);
     bitmap_t* free_map = bitmap_create(BITMAP_SIZE_BITS);
-    block_t *block = &(block_store->store[127]);
-    memcpy(block->data, free_map, BLOCK_SIZE_BYTES);
+    block_t *block = &(block_store->store[BITMAP_START_BLOCK]);
+    memcpy(block->data, free_map, BITMAP_SIZE_BYTES); //Bitmap does not take up more space than a single block
     bitmap_destroy(free_map);
     return block_store;
 }
