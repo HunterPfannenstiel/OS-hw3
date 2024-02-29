@@ -47,9 +47,13 @@ block_store_t *block_store_create()
         return NULL;
     }
     block_store->store = malloc(BLOCK_STORE_NUM_BYTES);// sizeof(block_t) = BLOCK_SIZE_BYTES, BLOCK_STORE_NUM_BYTES = BLOCK_SIZE_BYTES * BLOCK_STORE_NUM_BLOCKS
+    if(block_store->store == NULL)
+    {
+        return false;
+    }
     memset(block_store->store, 0, BLOCK_STORE_NUM_BYTES);
 
-    block_store->bitmap_overlay = bitmap_overlay(BITMAP_SIZE_BITS, block_store->store[BITMAP_START_BLOCK].data); //Might have to remove the block_t type if bitmap would take more than 1 block
+    block_store->bitmap_overlay = bitmap_overlay(BITMAP_SIZE_BITS, block_store->store[BITMAP_START_BLOCK].data);
 
     return block_store;
 }
