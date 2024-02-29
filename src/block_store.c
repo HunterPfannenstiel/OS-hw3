@@ -7,16 +7,14 @@
 
 typedef struct block 
 {
-    char data[BLOCK_SIZE_BYTES]; //Even though it is a char type it can be interpreted as any type by using the mem functions (char type is 1 byte)
+    char data[BLOCK_SIZE_BYTES]; //Even though it is a char type it can be interpreted as any type (char type is 1 byte)
 } block_t;
 
-//Will need to store the data in blocks of bytes (if user wants to store more than a byte they will need to do multiple requests)
-  struct block_store
-  {
+struct block_store
+{
     block_t* store;
     bitmap_t* bitmap_overlay;
-  };
-  
+};
 
 // You might find this handy.  I put it around unused parameters, but you should
 // remove it before you submit. Just allows things to compile initially.
@@ -34,20 +32,22 @@ void print_bytes(void* data, size_t num_bytes)
     printf("\n");
 }
 
-/*This function creates a new block store and returns a pointer to it. 
-It first allocates memory for the block store and initializes it to zeros using the memset 
-Then it sets the bitmap field of the block store to an overlay of a bitmap with size BITMAP_SIZE_BITS on the blocks starting at index BITMAP_START_BLOCK. 
-Finally, it marks the blocks used by the bitmap as allocated using the block_store_request function.*/
+bool block_id_in_range(size_t block_id);
+
+bool block_id_in_range(size_t block_id)
+{
+    return block_id < BLOCK_STORE_NUM_BLOCKS;
+}
+
 block_store_t *block_store_create()
 {
-    block_store_t* block_store = (struct block_store*)malloc(sizeof(block_store));
+    block_store_t* block_store = (block_store_t*)malloc(sizeof(block_store_t));
     if(block_store == NULL)
     {
         return NULL;
     }
-    int store_size = sizeof(block_t) * BLOCK_STORE_NUM_BLOCKS;
-    block_store->store = malloc(store_size);
-    memset(block_store->store, 0, store_size);
+    block_store->store = malloc(BLOCK_STORE_NUM_BYTES);// sizeof(block_t) = BLOCK_SIZE_BYTES, BLOCK_STORE_NUM_BYTES = BLOCK_SIZE_BYTES * BLOCK_STORE_NUM_BLOCKS
+    memset(block_store->store, 0, BLOCK_STORE_NUM_BYTES);
 
     block_store->bitmap_overlay = bitmap_overlay(BITMAP_SIZE_BITS, block_store->store[BITMAP_START_BLOCK].data); //Might have to remove the block_t type if bitmap would take more than 1 block
 
@@ -56,22 +56,25 @@ block_store_t *block_store_create()
 
 void block_store_destroy(block_store_t *const bs)
 {
-    UNUSED(bs);
+    if(bs != NULL)
+    {
+        bitmap_destroy(bs->bitmap_overlay);
+        free(bs->store);
+        free(bs);
+    }
 }
 size_t block_store_allocate(block_store_t *const bs)
 {
-    UNUSED(bs);
-    return 0;
+    if(bs == NULL)
+    {
+        return SIZE_MAX;
+    }
+    return bitmap_ffz(bs->bitmap_overlay);
 }
 
-/*This function marks a specific block as allocated in the bitmap. 
-It first checks if the pointer to the block store is not NULL and if the block_id is within the range of valid block indices. 
-If the block is already marked as allocated, it returns false. 
-Otherwise, it marks the block as allocated and checks that the block was indeed marked as allocated by testing the bitmap. 
-It returns true if the block was successfully marked as allocated, false otherwise.*/
 bool block_store_request(block_store_t *const bs, const size_t block_id)
 {
-    if(bs == NULL || block_id >= BLOCK_STORE_NUM_BLOCKS) //*block_id is unsigned (don't check less than 0)
+    if(bs == NULL || !block_id_in_range(block_id)) //*block_id is unsigned (don't check less than 0)
     {
         return false;
     }
