@@ -10,7 +10,7 @@ extern "C"
 #include <stdbool.h>
 
 	// Constants
-#define BITMAP_SIZE_BYTES 32         //  
+#define BITMAP_SIZE_BYTES 32         //  The literal size of the bitmap struct
 #define BITMAP_SIZE_BITS (BITMAP_SIZE_BYTES * 8)
 #define BITMAP_START_BLOCK 127
 #define BLOCK_STORE_NUM_BLOCKS 256   // 2^ blocks. 

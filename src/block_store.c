@@ -14,12 +14,25 @@ typedef struct block
   struct block_store
   {
     block_t* store;
+    bitmap_t* bitmap_overlay;
   };
   
 
 // You might find this handy.  I put it around unused parameters, but you should
 // remove it before you submit. Just allows things to compile initially.
 #define UNUSED(x) (void)(x)
+
+void print_bytes(void* data, size_t num_bytes);
+
+void print_bytes(void* data, size_t num_bytes)
+{
+    char* bytes = (char*)data;
+    for(size_t i = 0; i < num_bytes; i++)
+    {
+        printf("%02X", bytes[i]);
+    }
+    printf("\n");
+}
 
 /*This function creates a new block store and returns a pointer to it. 
 It first allocates memory for the block store and initializes it to zeros using the memset 
@@ -28,12 +41,16 @@ Finally, it marks the blocks used by the bitmap as allocated using the block_sto
 block_store_t *block_store_create()
 {
     block_store_t* block_store = (struct block_store*)malloc(sizeof(block_store));
-    block_store->store = malloc(sizeof(block_t) * BLOCK_STORE_NUM_BLOCKS);
-    memset(block_store->store, 0, BLOCK_STORE_NUM_BYTES);
-    bitmap_t* free_map = bitmap_create(BITMAP_SIZE_BITS);
-    block_t *block = &(block_store->store[BITMAP_START_BLOCK]);
-    memcpy(block->data, free_map, BITMAP_SIZE_BYTES); //Bitmap does not take up more space than a single block
-    bitmap_destroy(free_map);
+    if(block_store == NULL)
+    {
+        return NULL;
+    }
+    int store_size = sizeof(block_t) * BLOCK_STORE_NUM_BLOCKS;
+    block_store->store = malloc(store_size);
+    memset(block_store->store, 0, store_size);
+
+    block_store->bitmap_overlay = bitmap_overlay(BITMAP_SIZE_BITS, block_store->store[BITMAP_START_BLOCK].data); //Might have to remove the block_t type if bitmap would take more than 1 block
+
     return block_store;
 }
 
@@ -47,11 +64,28 @@ size_t block_store_allocate(block_store_t *const bs)
     return 0;
 }
 
+/*This function marks a specific block as allocated in the bitmap. 
+It first checks if the pointer to the block store is not NULL and if the block_id is within the range of valid block indices. 
+If the block is already marked as allocated, it returns false. 
+Otherwise, it marks the block as allocated and checks that the block was indeed marked as allocated by testing the bitmap. 
+It returns true if the block was successfully marked as allocated, false otherwise.*/
 bool block_store_request(block_store_t *const bs, const size_t block_id)
 {
-    UNUSED(bs);
-    UNUSED(block_id);
-    return false;
+    if(bs == NULL || block_id >= BLOCK_STORE_NUM_BLOCKS) //*block_id is unsigned (don't check less than 0)
+    {
+        return false;
+    }
+    bitmap_t* overlay = bs->bitmap_overlay;
+    if(bitmap_test(overlay, block_id))
+    {
+        return false;
+    }
+    bitmap_set(overlay, block_id);
+    if(!bitmap_test(overlay, block_id))
+    {
+        return false;
+    }
+    return true;
 }
 
 void block_store_release(block_store_t *const bs, const size_t block_id)
