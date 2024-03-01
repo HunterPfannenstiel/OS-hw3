@@ -5,38 +5,27 @@
 #include "block_store.h"
 // include more if you need
 
-typedef struct block 
-{
-    char data[BLOCK_SIZE_BYTES]; //Even though it is a char type it can be interpreted as any type (char type is 1 byte)
-} block_t;
-
 struct block_store
 {
-    block_t* store;
+    char* store; //Tried defining as 'char store[BLOCK_STORE_NUM_BYTES]' but would get: "double free or corruption (top): 0x00000000007ca6a0 ***"
     bitmap_t* bitmap_overlay;
 };
 
 // You might find this handy.  I put it around unused parameters, but you should
 // remove it before you submit. Just allows things to compile initially.
 #define UNUSED(x) (void)(x)
-
-void print_bytes(void* data, size_t num_bytes);
-
-void print_bytes(void* data, size_t num_bytes)
-{
-    char* bytes = (char*)data;
-    for(size_t i = 0; i < num_bytes; i++)
-    {
-        printf("%02X", bytes[i]);
-    }
-    printf("\n");
-}
-
 bool block_id_in_range(size_t block_id);
 
 bool block_id_in_range(size_t block_id)
 {
-    return block_id < BLOCK_STORE_NUM_BLOCKS;
+    return block_id < BLOCK_STORE_NUM_BLOCKS; //*block_id is unsigned (don't worry about negatives)
+}
+
+size_t get_block_id_index(size_t block_id);
+
+size_t get_block_id_index(size_t block_id)
+{
+    return block_id * BLOCK_SIZE_BYTES;
 }
 
 block_store_t *block_store_create()
@@ -46,14 +35,20 @@ block_store_t *block_store_create()
     {
         return NULL;
     }
-    block_store->store = malloc(BLOCK_STORE_NUM_BYTES);// sizeof(block_t) = BLOCK_SIZE_BYTES, BLOCK_STORE_NUM_BYTES = BLOCK_SIZE_BYTES * BLOCK_STORE_NUM_BLOCKS
-    if(block_store->store == NULL)
-    {
-        return false;
-    }
+    block_store->store = malloc(BLOCK_STORE_NUM_BYTES);
+
     memset(block_store->store, 0, BLOCK_STORE_NUM_BYTES);
 
-    block_store->bitmap_overlay = bitmap_overlay(BITMAP_SIZE_BITS, block_store->store[BITMAP_START_BLOCK].data);
+    block_store->bitmap_overlay = bitmap_overlay(BITMAP_SIZE_BITS, block_store->store + get_block_id_index(BITMAP_START_BLOCK));
+
+    for(int i = 0; i < BITMAP_NUM_BLOCKS; i++)
+    {
+        if(!block_store_request(block_store, BITMAP_START_BLOCK + i))
+        {
+            block_store_destroy(block_store);
+            return NULL;
+        }
+    }
 
     return block_store;
 }
@@ -73,12 +68,17 @@ size_t block_store_allocate(block_store_t *const bs)
     {
         return SIZE_MAX;
     }
-    return bitmap_ffz(bs->bitmap_overlay);
+    size_t first_free_block = bitmap_ffz(bs->bitmap_overlay);
+    if(!block_store_request(bs, first_free_block))
+    {
+        return SIZE_MAX;
+    }
+    return first_free_block;
 }
 
 bool block_store_request(block_store_t *const bs, const size_t block_id)
 {
-    if(bs == NULL || !block_id_in_range(block_id)) //*block_id is unsigned (don't check less than 0)
+    if(bs == NULL || !block_id_in_range(block_id))
     {
         return false;
     }
@@ -97,8 +97,12 @@ bool block_store_request(block_store_t *const bs, const size_t block_id)
 
 void block_store_release(block_store_t *const bs, const size_t block_id)
 {
-    UNUSED(bs);
-    UNUSED(block_id);
+    if(bs == NULL || !block_id_in_range(block_id))
+    {
+        return;
+    }
+    bitmap_t* overlay = bs->bitmap_overlay;
+    bitmap_reset(overlay, block_id);
 }
 
 size_t block_store_get_used_blocks(const block_store_t *const bs)
