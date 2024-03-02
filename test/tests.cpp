@@ -337,6 +337,7 @@ TEST(block_store_write_read, valid_write_and_read) {
     score += 10;
 }
 
+// For tests accessing files, write permission must be set on the file
 
 TEST(block_store_serialize, valid_serialize) 
 {
