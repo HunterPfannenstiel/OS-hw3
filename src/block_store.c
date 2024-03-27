@@ -27,6 +27,18 @@ size_t get_block_id_index(size_t block_id)
     return block_id * BLOCK_SIZE_BYTES;
 }
 
+///
+/// Gets the block id for the index
+/// \param index The index in the block store
+/// \return The starting block id of the index
+///
+size_t index_to_block_id(int index);
+
+size_t index_to_block_id(int index)
+{
+    return index / BLOCK_SIZE_BYTES; // Divide the index by the number of bytes per block (integer division)
+}
+
 block_store_t *block_store_create()
 {
     block_store_t* block_store = (block_store_t*)malloc(sizeof(block_store_t));
@@ -109,97 +121,91 @@ size_t block_store_get_used_blocks(const block_store_t *const bs)
 {
     if(bs == NULL)
     {
-        return SIZE_MAX;
+        return SIZE_MAX; // Return SIZE_MAX (denoting an error) if bs is NULL
     }
-    return bitmap_total_set(bs->bitmap_overlay);
+    return bitmap_total_set(bs->bitmap_overlay); // Return the number of set bits in the bitmap
 }
 
 size_t block_store_get_free_blocks(const block_store_t *const bs)
 {
     if(bs == NULL)
     {
-        return SIZE_MAX;
+        return SIZE_MAX; // Return SIZE_MAX (denoting an error) if bs is NULL
     }
-    return BLOCK_STORE_NUM_BLOCKS - block_store_get_used_blocks(bs);
+    return BLOCK_STORE_NUM_BLOCKS - block_store_get_used_blocks(bs); // Return the total blocks minus the used blocks
 }
 
 size_t block_store_get_total_blocks()
 {
-    return BLOCK_STORE_NUM_BLOCKS;
+    return BLOCK_STORE_NUM_BLOCKS; // Return the total block constant
 }
 
 size_t block_store_read(const block_store_t *const bs, const size_t block_id, void *buffer)
 {
     if(bs == NULL || !block_id_in_range(block_id) || buffer == NULL)
     {
-        return 0;
+        return 0; // Return 0 if the block store is NULL, the block being accessed is not in range, or the write buffer is NULL
     }
-    int block_index = get_block_id_index(block_id);
-    memcpy(buffer, bs->store + block_index, BLOCK_SIZE_BYTES);
-    return BLOCK_SIZE_BYTES;
+    int block_index = get_block_id_index(block_id); // Get the associated index for the block id
+    memcpy(buffer, bs->store + block_index, BLOCK_SIZE_BYTES); // Starting at the block index in the block store, read one block worth of contents into the buffer
+    return BLOCK_SIZE_BYTES; // Return the number of bytes read
 }
 
 size_t block_store_write(block_store_t *const bs, const size_t block_id, const void *buffer)
 {
     if(bs == NULL || !block_id_in_range(block_id) || buffer == NULL)
     {
-        return 0;
+        return 0; // Return 0 if the block store is NULL, the block being accessed is not in range, or the read buffer is NULL
     }
-    int block_index = get_block_id_index(block_id);
-    memcpy(bs->store + block_index, buffer, BLOCK_SIZE_BYTES);
-    return BLOCK_SIZE_BYTES;
-}
-
-size_t index_to_block_id(int index);
-
-size_t index_to_block_id(int index)
-{
-    return index % BLOCK_SIZE_BYTES;
+    int block_index = get_block_id_index(block_id); // Get the associated index for the block id
+    memcpy(bs->store + block_index, buffer, BLOCK_SIZE_BYTES); // Starting at the block index in the block store, write one block worth of contents into the store from the buffer
+    return BLOCK_SIZE_BYTES; // Return the number of bytes written
 }
 
 block_store_t *block_store_deserialize(const char *const filename)
 {
     if(filename == NULL)
     {
-        return NULL;
+        return NULL; // Return NULL if the filename is NULL
     }
-    int file_descriptor = open(filename, O_RDONLY); // Open the file with the name denoted by output_filename in write only mode
+    int file_descriptor = open(filename, O_RDONLY); // Open the file with the name denoted by output_filename in read only mode
     if (file_descriptor < 0)
     {
+        return NULL; // Return NULL if the file wasn't able to be opened
+    }
+    block_store_t* block_store = block_store_create(); // Create a block store 
+    int read_bytes = read(file_descriptor, block_store->store, BLOCK_STORE_NUM_BYTES); // Read a block store worth of bytes from the file into the newly created block store
+    if(read_bytes != BLOCK_STORE_NUM_BYTES) // If a block store worth of bytes was not read
+    {
+        block_store_destroy(block_store); // Destroy the block store
         return NULL;
     }
-    block_store_t* block_store = block_store_create();
-    int read_bytes = read(file_descriptor, block_store->store, BLOCK_STORE_NUM_BYTES); // Read from the file into dst
-    if(read_bytes != BLOCK_STORE_NUM_BYTES)
+    close(file_descriptor); // Close the file
+    for(int i = 0; i < BLOCK_STORE_NUM_BYTES; i++) // Iterate over the number of bytes in the block store
     {
-        printf("Read bytes: %i\n", read_bytes);
-        block_store_destroy(block_store);
-        return NULL;
-    }
-    close(file_descriptor);
-    for(int i = 0; i < BLOCK_STORE_NUM_BYTES; i++)
-    {
-        if(block_store->store[i] != 0x00)
+        if(block_store->store[i] != 0x00) // If the current byte has data
         {
-            size_t block_id = index_to_block_id(i);
-            block_store_request(block_store, block_id);
+            size_t block_id = index_to_block_id(i); // Get the block id of the current index
+            block_store_request(block_store, block_id); // Request the block in the block store
+            size_t next_block_index = get_block_id_index(block_id + 1); // Get the starting index of the next block
+            i = next_block_index - 1; // Set i to the next index (minus 1 because the for loop will increment it)
         }
     }
-    return block_store;
+    return block_store; // Return the block store
 }
 
 size_t block_store_serialize(const block_store_t *const bs, const char *const filename)
 {
     if(bs == NULL)
     {
-        return 0;
+        return 0; // Return 0 if the block store is NULL
     }
-    int file_descriptor = open(filename, O_WRONLY | O_CREAT); // Open the file with the name denoted by output_filename in write only mode
+    int file_descriptor = open(filename, O_WRONLY | O_CREAT); // Open the file with the name denoted by filename in write only and create only mode
     if (file_descriptor < 0)
     {
-        return 0;
+        return 0; // Return 0 if the file could not be opened
     }
-    size_t written_bytes = write(file_descriptor, bs->store, BLOCK_STORE_NUM_BYTES); // Write the data in src into the file
+    size_t written_bytes = write(file_descriptor, bs->store, BLOCK_STORE_NUM_BYTES); // Write the data in the block store into the file
     close(file_descriptor);                                       // Close the file
-    return written_bytes;
+    return written_bytes; // Return the number of written bytes
 }
