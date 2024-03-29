@@ -180,7 +180,7 @@ block_store_t *block_store_deserialize(const char *const filename)
     {
         return NULL; // Return NULL if the filename is NULL
     }
-    int file_descriptor = open(filename, O_RDONLY); // Open the file with the name denoted by output_filename in read only mode
+    int file_descriptor = open(filename, O_RDONLY, S_IRWXO | S_IRWXG | S_IRWXU); // Open the file with the name denoted by output_filename in read only mode (and with permissions)
     if (file_descriptor < 0)
     {
         return NULL; // Return NULL if the file wasn't able to be opened
@@ -212,7 +212,7 @@ size_t block_store_serialize(const block_store_t *const bs, const char *const fi
     {
         return 0; // Return 0 if the block store is NULL
     }
-    int file_descriptor = open(filename, O_WRONLY | O_CREAT); // Open the file with the name denoted by filename in write only and create only mode
+    int file_descriptor = open(filename, O_WRONLY | O_CREAT, S_IRWXO | S_IRWXG | S_IRWXU); // Open the file with the name denoted by filename in write only and create only mode  (and with permissions)
     if (file_descriptor < 0)
     {
         return 0; // Return 0 if the file could not be opened
